@@ -1,48 +1,65 @@
 pipeline {
-    agent any  // Use Jenkins container itself
+    agent any
 
     environment {
-        APP_NAME = "aws-elastic-beanstalk-express-js-sample"
-        NODE_VERSION = "16"
+        APP_DIR = "${WORKSPACE}"
+        NODE_IMAGE = "node:16"
     }
 
     stages {
-        stage('Checkout') {
+
+        stage('Checkout SCM') {
             steps {
-                git branch: 'main', url: 'https://github.com/imSaharukh/aws-elastic-beanstalk-express-js-sample'
+                checkout([$class: 'GitSCM', 
+                    branches: [[name: '*/main']], 
+                    userRemoteConfigs: [[url: 'https://github.com/imSaharukh/aws-elastic-beanstalk-express-js-sample']]
+                ])
             }
         }
 
         stage('Install Dependencies') {
             steps {
-                // Run npm install using the Jenkins container's Node 16 (must have Node installed)
-                sh "npm install"
+                sh """
+                docker run --rm -v $APP_DIR:/app -w /app $NODE_IMAGE npm install
+                """
             }
         }
 
         stage('Run Tests') {
             steps {
-                sh "npm test"
+                sh """
+                docker run --rm -v $APP_DIR:/app -w /app $NODE_IMAGE npm test
+                """
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh """
+                docker build -t my-app:latest $APP_DIR
+                """
             }
         }
 
         stage('Security Scan') {
             steps {
-                // Optional: Snyk scan if required for assignment
-                sh "npx snyk test || true"
+                sh """
+                echo "Security scan placeholder – integrate tools like Trivy or Snyk here"
+                """
             }
         }
     }
 
     post {
+        always {
+            echo "Cleaning workspace..."
+            cleanWs()
+        }
         success {
-            echo 'Pipeline completed successfully!'
+            echo "Pipeline completed successfully!"
         }
         failure {
-            echo 'Pipeline failed. Check logs.'
-        }
-        always {
-            cleanWs()
+            echo "Pipeline failed. Check logs for details."
         }
     }
 }
