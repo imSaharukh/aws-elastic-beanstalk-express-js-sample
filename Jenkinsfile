@@ -1,65 +1,35 @@
 pipeline {
     agent any
 
-    environment {
-        APP_DIR = "${WORKSPACE}"
-        NODE_IMAGE = "node:16"
-    }
-
     stages {
-
-        stage('Checkout SCM') {
+        stage('Checkout') {
             steps {
-                checkout([$class: 'GitSCM', 
-                    branches: [[name: '*/main']], 
-                    userRemoteConfigs: [[url: 'https://github.com/imSaharukh/aws-elastic-beanstalk-express-js-sample']]
-                ])
+                git url: 'https://github.com/imSaharukh/aws-elastic-beanstalk-express-js-sample', branch: 'main'
             }
         }
 
         stage('Install Dependencies') {
             steps {
-                sh """
-                docker run --rm -v $APP_DIR:/app -w /app $NODE_IMAGE npm install
-                """
+                sh 'docker run --rm -v $PWD:/app -w /app node:16 npm install'
             }
         }
 
         stage('Run Tests') {
             steps {
-                sh """
-                docker run --rm -v $APP_DIR:/app -w /app $NODE_IMAGE npm test
-                """
+                sh 'docker run --rm -v $PWD:/app -w /app node:16 npm test'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh """
-                docker build -t my-app:latest $APP_DIR
-                """
-            }
-        }
-
-        stage('Security Scan') {
-            steps {
-                sh """
-                echo "Security scan placeholder – integrate tools like Trivy or Snyk here"
-                """
+                sh 'docker build -t my-app-image .'
             }
         }
     }
 
     post {
         always {
-            echo "Cleaning workspace..."
             cleanWs()
-        }
-        success {
-            echo "Pipeline completed successfully!"
-        }
-        failure {
-            echo "Pipeline failed. Check logs for details."
         }
     }
 }
