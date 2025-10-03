@@ -1,27 +1,34 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'node:16'
+            args '-u root:root' // run as root to avoid permission issues
+        }
+    }
 
     environment {
-        DOCKERHUB_REPO = credentials('dockerhub-repo-name')
-        SNYK_TOKEN = credentials('snyk-token')
+        DOCKERHUB_REPO = credentials('dockerhub-repo-name')  // Docker Hub repo (username/repo)
+        DOCKERHUB_CREDS = 'dockerhub-creds'                  // Docker Hub credentials ID
+        SNYK_TOKEN = credentials('snyk-token')              // Snyk token
     }
 
     stages {
 
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
         stage('Install Dependencies') {
             steps {
-                // Run Node commands inside a Node container using DinD
-                sh '''
-                    docker run --rm -v $PWD:/app -w /app node:16 npm install --save
-                '''
+                sh 'npm install --save'
             }
         }
 
         stage('Test') {
             steps {
-                sh '''
-                    docker run --rm -v $PWD:/app -w /app node:16 npm test || true
-                '''
+                sh 'npm test || true'
             }
         }
 
@@ -36,7 +43,7 @@ pipeline {
         stage('Push Docker Image') {
             steps {
                 script {
-                    docker.withRegistry('', 'dockerhub-creds') {
+                    docker.withRegistry('', "${DOCKERHUB_CREDS}") {
                         docker.image("${DOCKERHUB_REPO}").push("latest")
                     }
                 }
@@ -45,13 +52,10 @@ pipeline {
 
         stage('Snyk Security Scan') {
             steps {
-                // Snyk inside Node container
                 sh '''
-                    docker run --rm -v $PWD:/app -w /app node:16 sh -c "
-                        npm install -g snyk &&
-                        snyk auth ${SNYK_TOKEN} &&
-                        snyk test --severity-threshold=high || true
-                    "
+                npm install -g snyk
+                snyk auth ${SNYK_TOKEN}
+                snyk test --severity-threshold=high || true
                 '''
             }
         }
@@ -60,6 +64,12 @@ pipeline {
             steps {
                 archiveArtifacts artifacts: 'package.json, package-lock.json, **/npm-debug.log, .snyk, snyk-result.json', allowEmptyArchive: true
             }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()  // clean workspace after build
         }
     }
 }
