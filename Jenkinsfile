@@ -15,37 +15,36 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh 'docker run --rm -v $WORKSPACE_DIR:/app -w /app node:16 npm install'
+                sh 'ls -l $WORKSPACE_DIR'  // check that package.json exists
+                sh "docker run --rm -v $WORKSPACE_DIR:/app -w /app $DOCKER_IMAGE npm install"
             }
         }
 
         stage('Test') {
             steps {
-                sh 'docker run --rm -v $WORKSPACE_DIR:/app -w /app node:16 npm test'
+                sh "docker run --rm -v $WORKSPACE_DIR:/app -w /app $DOCKER_IMAGE npm test"
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t my-app:latest $WORKSPACE_DIR'
+                sh "docker build -t my-app:latest $WORKSPACE_DIR"
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                withCredentials([string(credentialsId: 'DOCKERHUB_REPO_PSW', variable: 'DOCKERHUB_PASSWORD')]) {
-                    sh '''
-                        echo $DOCKERHUB_PASSWORD | docker login -u $DOCKERHUB_REPO --password-stdin
-                        docker push my-app:latest
-                    '''
-                }
+                sh '''
+                    echo $DOCKERHUB_REPO_PSW | docker login -u $DOCKERHUB_REPO --password-stdin
+                    docker push my-app:latest
+                '''
             }
         }
 
         stage('Snyk Security Scan') {
             steps {
                 withCredentials([string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN')]) {
-                    sh 'docker run --rm -v $WORKSPACE_DIR:/app -w /app node:16 npx snyk test'
+                    sh "docker run --rm -v $WORKSPACE_DIR:/app -w /app node:16 npx snyk test"
                 }
             }
         }
