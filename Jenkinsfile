@@ -20,20 +20,20 @@ pipeline {
         stage('Build Node Test Image') {
             steps {
                 script {
-                    // Build a Node 20 image with the app and dependencies preinstalled
-                    sh """
+                    sh '''
                         cat > Dockerfile.test <<EOF
-                        FROM node:20
-                        WORKDIR /app
-                        COPY . .
-                        RUN npm install
-                        CMD ["npm", "test"]
-                        EOF
-                    """
+        FROM node:20
+        WORKDIR /app
+        COPY . .
+        RUN npm install
+        CMD ["npm", "test"]
+        EOF
+                    '''
                     sh "docker build -t ${DOCKER_IMAGE} -f Dockerfile.test ."
                 }
             }
         }
+
 
         stage('Test') {
             steps {
