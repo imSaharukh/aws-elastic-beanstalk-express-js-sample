@@ -1,15 +1,15 @@
 pipeline {
     agent {
         docker {
-            image 'docker:24.0.6-cli' // Docker CLI image
-            args '-v /var/run/docker.sock:/var/run/docker.sock -v $WORKSPACE:$WORKSPACE'
+            image 'saharukh/node-docker:16' // prebuilt image with node + docker
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
         }
     }
 
     environment {
         SNYK_TOKEN = credentials('snyk-token')
-        DOCKERHUB_CREDS = 'dockerhub-creds'
         DOCKERHUB_REPO = 'yourdockerhub/repo'
+        DOCKERHUB_CREDS = 'dockerhub-creds'
     }
 
     stages {
@@ -19,12 +19,9 @@ pipeline {
             }
         }
 
-        stage('Install Node & Dependencies') {
+        stage('Install Dependencies') {
             steps {
-                sh '''
-                    apk add --no-cache nodejs npm
-                    npm install
-                '''
+                sh 'npm install'
             }
         }
 
@@ -50,11 +47,7 @@ pipeline {
 
         stage('Snyk Scan') {
             steps {
-                sh '''
-                    npm install -g snyk
-                    snyk auth $SNYK_TOKEN
-                    snyk test --severity-threshold=high || true
-                '''
+                sh 'snyk test --severity-threshold=high || true'
             }
         }
 
