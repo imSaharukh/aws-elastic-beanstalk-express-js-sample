@@ -1,15 +1,9 @@
 pipeline {
-    agent {
-        docker {
-            image 'saharukh/node-docker:16' // prebuilt image with node + docker
-            args '-v /var/run/docker.sock:/var/run/docker.sock'
-        }
-    }
+    agent any
 
     environment {
-        SNYK_TOKEN = credentials('snyk-token')
-        DOCKERHUB_REPO = 'yourdockerhub/repo'
-        DOCKERHUB_CREDS = 'dockerhub-creds'
+        DOCKER_IMAGE = 'node:16'
+        WORKSPACE_DIR = "${env.WORKSPACE}"
     }
 
     stages {
@@ -21,39 +15,58 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh 'npm install'
+                script {
+                    docker.image(DOCKER_IMAGE).inside {
+                        sh 'npm install'
+                    }
+                }
             }
         }
 
         stage('Test') {
             steps {
-                sh 'npm test || true'
+                script {
+                    docker.image(DOCKER_IMAGE).inside {
+                        sh 'npm test'
+                    }
+                }
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t ${DOCKERHUB_REPO}:latest ."
+                script {
+                    docker.image('docker:24.0.6-cli').inside('--privileged -v /var/run/docker.sock:/var/run/docker.sock') {
+                        sh 'docker build -t my-app:latest .'
+                    }
+                }
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                withDockerRegistry(credentialsId: "${DOCKERHUB_CREDS}", url: '') {
-                    sh "docker push ${DOCKERHUB_REPO}:latest"
+                script {
+                    docker.image('docker:24.0.6-cli').inside('--privileged -v /var/run/docker.sock:/var/run/docker.sock') {
+                        sh '''
+                            echo $DOCKERHUB_REPO_PSW | docker login -u $DOCKERHUB_REPO --password-stdin
+                            docker push my-app:latest
+                        '''
+                    }
                 }
             }
         }
 
-        stage('Snyk Scan') {
+        stage('Snyk Security Scan') {
             steps {
-                sh 'snyk test --severity-threshold=high || true'
+                withCredentials([string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN')]) {
+                    sh 'snyk test'
+                }
             }
         }
 
         stage('Archive Artifacts') {
             steps {
-                archiveArtifacts artifacts: 'package.json, package-lock.json', allowEmptyArchive: true
+                archiveArtifacts artifacts: '**/build/**', fingerprint: true
             }
         }
     }
