@@ -2,8 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = 'my-app:latest'
-        DOCKERHUB_REPO = credentials('dockerhub-repo-name')
+        DOCKER_IMAGE = 'imsaharukh/project2-compose:latest'
         SNYK_TOKEN = credentials('snyk-token')
         DOCKER_HOST = 'tcp://docker:2376'
         DOCKER_CERT_PATH = '/certs/client'
@@ -20,21 +19,20 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                echo 'Building Docker image for app'
+                echo "Building Docker image ${env.DOCKER_IMAGE}"
                 sh "docker build -t ${DOCKER_IMAGE} ${env.WORKSPACE}"
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                echo 'Pushing Docker image to Docker Hub'
+                echo "Pushing Docker image ${env.DOCKER_IMAGE} to Docker Hub"
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
                     sh 'echo $PASS | docker login -u $USER --password-stdin'
-                    sh 'docker push my-app:latest'
+                    sh "docker push ${DOCKER_IMAGE}"
                 }
             }
         }
-
 
         stage('Snyk Security Scan') {
             steps {
