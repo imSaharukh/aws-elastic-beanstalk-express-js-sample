@@ -2,8 +2,11 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = 'node:16'
-        WORKSPACE_DIR = "${env.WORKSPACE}"
+        DOCKER_HOST = 'tcp://docker:2376'
+        DOCKER_TLS_VERIFY = '1'
+        DOCKER_CERT_PATH = '/certs/client'
+        DOCKER_IMAGE_NODE = 'node:16'
+        DOCKER_IMAGE_CLI = 'docker:24.0.6-cli'
     }
 
     stages {
