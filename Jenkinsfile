@@ -50,8 +50,9 @@ pipeline {
 
         stage('Archive Artifacts') {
             steps {
-                archiveArtifacts artifacts: '**/build/**', fingerprint: true
+                archiveArtifacts artifacts: 'package*.json,Dockerfile,Jenkinsfile,**/*.env', fingerprint: true
             }
         }
+
     }
 }
