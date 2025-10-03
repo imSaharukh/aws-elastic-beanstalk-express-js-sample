@@ -3,7 +3,6 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = 'node:16'
-        DOCKER_HOST = 'tcp://docker:2375'  // Connect to DinD without TLS
         WORKSPACE_DIR = "${env.WORKSPACE}"
     }
 
@@ -28,9 +27,7 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh '''
-                    docker build -t my-app:latest $WORKSPACE_DIR
-                '''
+                sh 'docker build -t my-app:latest $WORKSPACE_DIR'
             }
         }
 
