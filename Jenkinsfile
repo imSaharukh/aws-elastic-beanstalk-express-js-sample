@@ -1,60 +1,39 @@
 pipeline {
     agent any
-
     environment {
-        DOCKER_HOST = 'tcp://docker:2376'
-        DOCKER_TLS_VERIFY = '1'
-        DOCKER_CERT_PATH = '/certs/client'
-        DOCKER_IMAGE_NODE = 'node:16'
-        DOCKER_IMAGE_CLI = 'docker:24.0.6-cli'
+        DOCKER_IMAGE = 'node:16'
+        DOCKERHUB_REPO = credentials('dockerhub-repo-name')
+        SNYK_TOKEN = credentials('snyk-token')
     }
-
     stages {
         stage('Checkout') {
-            steps {
-                checkout scm
-            }
+            steps { checkout scm }
         }
 
         stage('Install Dependencies') {
             steps {
-                sh 'ls -l $WORKSPACE_DIR'  // check that package.json exists
-                sh "docker run --rm -v $WORKSPACE_DIR:/app -w /app $DOCKER_IMAGE npm install"
+                sh "docker run --rm -v ${env.WORKSPACE}:/app -w /app ${DOCKER_IMAGE} npm install"
             }
         }
 
         stage('Test') {
             steps {
-                sh "docker run --rm -v $WORKSPACE_DIR:/app -w /app $DOCKER_IMAGE npm test"
+                sh "docker run --rm -v ${env.WORKSPACE}:/app -w /app ${DOCKER_IMAGE} npm test"
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t my-app:latest $WORKSPACE_DIR"
+                sh "docker build -t my-app:latest ${env.WORKSPACE}"
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                sh '''
-                    echo $DOCKERHUB_REPO_PSW | docker login -u $DOCKERHUB_REPO --password-stdin
-                    docker push my-app:latest
-                '''
-            }
-        }
-
-        stage('Snyk Security Scan') {
-            steps {
-                withCredentials([string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN')]) {
-                    sh "docker run --rm -v $WORKSPACE_DIR:/app -w /app node:16 npx snyk test"
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                    sh 'echo $PASS | docker login -u $USER --password-stdin'
+                    sh 'docker push my-app:latest'
                 }
-            }
-        }
-
-        stage('Archive Artifacts') {
-            steps {
-                archiveArtifacts artifacts: '**/build/**', fingerprint: true
             }
         }
     }
