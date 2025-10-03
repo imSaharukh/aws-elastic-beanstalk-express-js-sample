@@ -19,10 +19,10 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                // Run npm install inside Node container, mounting Jenkins workspace
-                sh "docker run --rm -v ${env.WORKSPACE}:/app -w /app ${DOCKER_IMAGE} npm install"
+                sh 'npm install'
             }
         }
+
 
         stage('Test') {
             steps {
