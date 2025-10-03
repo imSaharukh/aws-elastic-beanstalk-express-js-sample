@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = 'my-app-node:latest' // custom Node test image
+        DOCKER_IMAGE = 'my-app:latest'
         DOCKERHUB_REPO = credentials('dockerhub-repo-name')
         SNYK_TOKEN = credentials('snyk-token')
         DOCKER_HOST = 'tcp://docker:2376'
@@ -13,60 +13,31 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                echo "Checking out source code"
+                echo 'Checking out source code'
                 checkout scm
-                sh 'ls -la ${WORKSPACE}' // debug: check files after checkout
-            }
-        }
-
-        stage('Build Node Test Image') {
-            steps {
-                script {
-                    echo "Creating Dockerfile.test for Node test image"
-                    sh '''
-cat > Dockerfile.test <<EOF
-FROM node:20
-WORKDIR /app
-COPY . .
-RUN npm install
-CMD ["npm", "test"]
-EOF
-'''
-                    sh "docker build -t ${DOCKER_IMAGE} -f Dockerfile.test ."
-                }
-            }
-        }
-
-        stage('Test') {
-            steps {
-                echo "Listing current workspace files for debug"
-                sh 'ls -la ${WORKSPACE}'
-                echo "Running tests inside Docker image (without mounting workspace)"
-                // Run container using baked-in files
-                sh "docker run --rm ${DOCKER_IMAGE}"
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                echo "Building Docker image for deployment"
-                sh "docker build -t my-app:latest ${env.WORKSPACE}"
+                echo 'Building Docker image for app'
+                sh "docker build -t ${DOCKER_IMAGE} ${env.WORKSPACE}"
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                echo "Pushing Docker image to Docker Hub"
+                echo 'Pushing Docker image to Docker Hub'
                 withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
                     sh 'echo $PASS | docker login -u $USER --password-stdin'
-                    sh 'docker push my-app:latest'
+                    sh "docker push ${DOCKER_IMAGE}"
                 }
             }
         }
 
         stage('Snyk Security Scan') {
             steps {
-                echo "Running Snyk security scan"
+                echo 'Running Snyk security scan'
                 withCredentials([string(credentialsId: 'snyk-token', variable: 'SNYK_TOKEN')]) {
                     sh "docker run --rm -v ${env.WORKSPACE}:/app -w /app snyk/snyk-cli:docker test --all-projects"
                 }
@@ -75,7 +46,6 @@ EOF
 
         stage('Archive Artifacts') {
             steps {
-                echo "Archiving build artifacts"
                 archiveArtifacts artifacts: '**/build/**', fingerprint: true
             }
         }
