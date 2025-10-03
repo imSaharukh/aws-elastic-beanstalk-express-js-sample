@@ -1,9 +1,5 @@
 pipeline {
-    agent {
-        docker {
-            image 'node:16'
-        }
-    }
+    agent any
 
     environment {
         DOCKERHUB_REPO = credentials('dockerhub-repo-name')
@@ -11,15 +7,21 @@ pipeline {
     }
 
     stages {
+
         stage('Install Dependencies') {
             steps {
-                sh 'npm install --save'
+                // Run Node commands inside a Node container using DinD
+                sh '''
+                    docker run --rm -v $PWD:/app -w /app node:16 npm install --save
+                '''
             }
         }
 
         stage('Test') {
             steps {
-                sh 'npm test || true'
+                sh '''
+                    docker run --rm -v $PWD:/app -w /app node:16 npm test || true
+                '''
             }
         }
 
@@ -43,10 +45,13 @@ pipeline {
 
         stage('Snyk Security Scan') {
             steps {
+                // Snyk inside Node container
                 sh '''
-                npm install -g snyk
-                snyk auth ${SNYK_TOKEN}
-                snyk test --severity-threshold=high || true
+                    docker run --rm -v $PWD:/app -w /app node:16 sh -c "
+                        npm install -g snyk &&
+                        snyk auth ${SNYK_TOKEN} &&
+                        snyk test --severity-threshold=high || true
+                    "
                 '''
             }
         }
