@@ -38,7 +38,7 @@ pipeline {
             steps {
                 echo 'Running Snyk security scan'
                 withCredentials([string(credentialsId: 'snyk-token', variable: 'SNYK_TOKEN')]) {
-                    sh "docker run --rm -v ${env.WORKSPACE}:/app -w /app snyk/snyk-cli:docker test --all-projects"
+                    sh "docker run --rm --platform linux/amd64 -v ${env.WORKSPACE}:/app -w /app snyk/snyk-cli:docker test --all-projects"
                 }
             }
         }
