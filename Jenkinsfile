@@ -38,10 +38,17 @@ pipeline {
             steps {
                 echo 'Running Snyk security scan'
                 withCredentials([string(credentialsId: 'snyk-token', variable: 'SNYK_TOKEN')]) {
-                    sh "docker run --rm --platform linux/amd64 -v ${env.WORKSPACE}:/app -w /app snyk/snyk-cli:docker test --all-projects"
+                    sh """
+                    docker run --rm --platform linux/amd64 -v ${env.WORKSPACE}:/app -w /app node:20-alpine sh -c '
+                        npm install -g snyk &&
+                        snyk auth $SNYK_TOKEN &&
+                        snyk test --all-projects
+                    '
+                    """
                 }
             }
         }
+
 
         stage('Archive Artifacts') {
             steps {
