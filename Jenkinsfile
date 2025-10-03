@@ -5,9 +5,6 @@ pipeline {
         DOCKERHUB_REPO = credentials('dockerhub-repo-name')
         DOCKERHUB_CREDS = 'dockerhub-creds'
         SNYK_TOKEN = credentials('snyk-token')
-        DOCKER_HOST = 'tcp://docker:2376'
-        DOCKER_TLS_VERIFY = '1'
-        DOCKER_CERT_PATH = '/certs/client'
     }
 
     stages {
@@ -19,13 +16,13 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh 'npm install --save'
+                sh 'docker run --rm -v $PWD:/app -w /app node:16 npm install --save'
             }
         }
 
         stage('Test') {
             steps {
-                sh 'npm test || true'
+                sh 'docker run --rm -v $PWD:/app -w /app node:16 npm test || true'
             }
         }
 
@@ -49,11 +46,13 @@ pipeline {
 
         stage('Snyk Security Scan') {
             steps {
-                sh """
-                    npm install -g snyk
-                    snyk auth ${SNYK_TOKEN}
-                    snyk test --severity-threshold=high || true
-                """
+                sh '''
+                    docker run --rm -v $PWD:/app -w /app node:16 sh -c "
+                        npm install -g snyk &&
+                        snyk auth ${SNYK_TOKEN} &&
+                        snyk test --severity-threshold=high || true
+                    "
+                '''
             }
         }
 
