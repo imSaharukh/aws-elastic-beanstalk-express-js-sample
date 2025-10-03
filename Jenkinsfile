@@ -13,14 +13,16 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
+                echo "Checking out source code"
                 checkout scm
+                sh 'ls -la ${WORKSPACE}' // debug: check files after checkout
             }
         }
 
         stage('Build Node Test Image') {
             steps {
                 script {
-                    // Create Dockerfile for Node test image
+                    echo "Creating Dockerfile.test for Node test image"
                     sh '''
 cat > Dockerfile.test <<EOF
 FROM node:20
@@ -37,21 +39,24 @@ EOF
 
         stage('Test') {
             steps {
-                // Run tests using the custom Node image
-                sh "docker run --rm -v ${env.WORKSPACE}:/app -w /app ${DOCKER_IMAGE}"
+                echo "Listing current workspace files for debug"
+                sh 'ls -la ${WORKSPACE}'
+                echo "Running tests inside Docker image (without mounting workspace)"
+                // Run container using baked-in files
+                sh "docker run --rm ${DOCKER_IMAGE}"
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                // Build Docker image for deployment
+                echo "Building Docker image for deployment"
                 sh "docker build -t my-app:latest ${env.WORKSPACE}"
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                // Push to Docker Hub using credentials
+                echo "Pushing Docker image to Docker Hub"
                 withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
                     sh 'echo $PASS | docker login -u $USER --password-stdin'
                     sh 'docker push my-app:latest'
@@ -61,7 +66,7 @@ EOF
 
         stage('Snyk Security Scan') {
             steps {
-                // Scan using Snyk
+                echo "Running Snyk security scan"
                 withCredentials([string(credentialsId: 'snyk-token', variable: 'SNYK_TOKEN')]) {
                     sh "docker run --rm -v ${env.WORKSPACE}:/app -w /app snyk/snyk-cli:docker test --all-projects"
                 }
@@ -70,6 +75,7 @@ EOF
 
         stage('Archive Artifacts') {
             steps {
+                echo "Archiving build artifacts"
                 archiveArtifacts artifacts: '**/build/**', fingerprint: true
             }
         }
