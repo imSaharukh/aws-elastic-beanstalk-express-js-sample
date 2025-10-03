@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = 'my-app-node:latest' // custom image we will build
+        DOCKER_IMAGE = 'my-app-node:latest' // custom Node test image
         DOCKERHUB_REPO = credentials('dockerhub-repo-name')
         SNYK_TOKEN = credentials('snyk-token')
         DOCKER_HOST = 'tcp://docker:2376'
@@ -20,25 +20,25 @@ pipeline {
         stage('Build Node Test Image') {
             steps {
                 script {
+                    // Create Dockerfile for Node test image
                     sh '''
-                        cat > Dockerfile.test <<EOF
-        FROM node:20
-        WORKDIR /app
-        COPY . .
-        RUN npm install
-        CMD ["npm", "test"]
-        EOF
-                    '''
+cat > Dockerfile.test <<EOF
+FROM node:20
+WORKDIR /app
+COPY . .
+RUN npm install
+CMD ["npm", "test"]
+EOF
+'''
                     sh "docker build -t ${DOCKER_IMAGE} -f Dockerfile.test ."
                 }
             }
         }
 
-
         stage('Test') {
             steps {
-                // Run tests using the custom image
-                sh "docker run --rm ${DOCKER_IMAGE}"
+                // Run tests using the custom Node image
+                sh "docker run --rm -v ${env.WORKSPACE}:/app -w /app ${DOCKER_IMAGE}"
             }
         }
 
