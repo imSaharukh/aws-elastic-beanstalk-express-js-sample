@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = 'node:16'
+        DOCKER_HOST = 'tcp://docker:2375'  // Connect to DinD without TLS
         WORKSPACE_DIR = "${env.WORKSPACE}"
     }
 
@@ -15,43 +16,31 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                script {
-                    docker.image(DOCKER_IMAGE).inside {
-                        sh 'npm install'
-                    }
-                }
+                sh 'docker run --rm -v $WORKSPACE_DIR:/app -w /app node:16 npm install'
             }
         }
 
         stage('Test') {
             steps {
-                script {
-                    docker.image(DOCKER_IMAGE).inside {
-                        sh 'npm test'
-                    }
-                }
+                sh 'docker run --rm -v $WORKSPACE_DIR:/app -w /app node:16 npm test'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    docker.image('docker:24.0.6-cli').inside('--privileged -v /var/run/docker.sock:/var/run/docker.sock') {
-                        sh 'docker build -t my-app:latest .'
-                    }
-                }
+                sh '''
+                    docker build -t my-app:latest $WORKSPACE_DIR
+                '''
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                script {
-                    docker.image('docker:24.0.6-cli').inside('--privileged -v /var/run/docker.sock:/var/run/docker.sock') {
-                        sh '''
-                            echo $DOCKERHUB_REPO_PSW | docker login -u $DOCKERHUB_REPO --password-stdin
-                            docker push my-app:latest
-                        '''
-                    }
+                withCredentials([string(credentialsId: 'DOCKERHUB_REPO_PSW', variable: 'DOCKERHUB_PASSWORD')]) {
+                    sh '''
+                        echo $DOCKERHUB_PASSWORD | docker login -u $DOCKERHUB_REPO --password-stdin
+                        docker push my-app:latest
+                    '''
                 }
             }
         }
@@ -59,7 +48,7 @@ pipeline {
         stage('Snyk Security Scan') {
             steps {
                 withCredentials([string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN')]) {
-                    sh 'snyk test'
+                    sh 'docker run --rm -v $WORKSPACE_DIR:/app -w /app node:16 npx snyk test'
                 }
             }
         }
